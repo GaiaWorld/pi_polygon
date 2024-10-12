@@ -1,3 +1,7 @@
+
+
+use std::ops::Range;
+
 /**
  * 矩形切圆角矩形
  * * input:
@@ -11,7 +15,7 @@
  */
 // pub fn split_by_radius(x: f32, y: f32, w: f32, h: f32, radius: f32, z: f32, segment: Option<usize>) -> (Vec<f32>, Vec<u16>) {
 pub fn split_by_radius(x: f32, y: f32, w: f32, h: f32, radius: f32, segment: Option<usize>) -> (Vec<f32>, Vec<u16>) {
-    let mut points:  Vec<f32>;
+    let points:  Vec<f32>;
     let mut indices: Vec<u16> = Vec::new();
 
     let point_len: usize = 2;
@@ -73,8 +77,14 @@ pub fn split_by_radius_border(x: f32, y: f32, w: f32, h: f32, radius: f32, borde
  *      points:     结果点列表
  *      indices:    [结果多边形点序号列表]
  */
-pub fn split_by_lg(positions: Vec<f32>, indices: Vec<u16>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> (Vec<f32>, Vec<Vec<u16>>) {
-    split_by_lg_0(positions, &indices, lg_pos, start, end)
+pub fn split_by_lg(result: &mut PolygonIndices, positions: &mut Vec<f32>,  attrs: &mut [Attribute], indices: &[u16], lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> PolygonSlice {
+    let index_start = result.indices.len();
+    let count_start = result.counts.len();
+    split_by_lg_0(result, positions, attrs, indices, lg_pos, start, end);
+    PolygonSlice {
+        start: index_start,
+        range: count_start..result.counts.len(),
+    }
 }
 
 /**
@@ -89,15 +99,13 @@ pub fn split_by_lg(positions: Vec<f32>, indices: Vec<u16>, lg_pos: &[f32], start
  *      points:     结果点列表
  *      indices:    [结果多边形点序号列表]
  */
-pub fn split_mult_by_lg(mut positions: Vec<f32>, indices: Vec<Vec<u16>>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> (Vec<f32>, Vec<Vec<u16>>){
-    let mut res_indices: Vec<Vec<u16>> = Vec::new();
-    for cfg in indices {
-        let (_positions, ins) = split_by_lg(positions, cfg, lg_pos, start, end);
-        positions = _positions;
-        res_indices.extend_from_slice(&ins);
+pub fn split_mult_by_lg(result: &mut PolygonIndices, positions: &mut Vec<f32>, attrs: &mut [Attribute], indices: &PolygonIndices, indices_slice: PolygonSlice, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) {
+    let a: &[usize] = &indices.counts[indices_slice.range];
+    let mut index_start = indices_slice.start;
+    for i in a.iter() {
+        split_by_lg(result, positions, attrs, &indices.indices[index_start..index_start + *i], lg_pos, start, end);
+        index_start += *i;
     }
-
-    (positions, res_indices)
 }
 /**
  * 沿指定方向对指定属性列表做指定点的插值
@@ -112,30 +120,30 @@ pub fn split_mult_by_lg(mut positions: Vec<f32>, indices: Vec<Vec<u16>>, lg_pos:
  * output:
  *      attrs
  */
-pub fn interp_by_lg(positions: &[f32], indices: &[u16], attrs: Vec<Vec<f32>>, lg_attrs: &Vec<LgCfg>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> Vec<Vec<f32>> {
-    interp_by_lg_0(positions, indices, attrs, lg_attrs, lg_pos, start, end)
+pub fn interp_by_lg(positions: &[f32], indices: &[u16], attrs: &mut [&mut Vec<f32>], lg_attrs: &Vec<LgCfg>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) {
+    interp_by_lg_0(positions, indices, attrs, lg_attrs, lg_pos, start, end);
 }
 
-pub fn interp_mult_by_lg(positions: &[f32], indices: &Vec<Vec<u16>>, mut attrs: Vec<Vec<f32>>, lg_attrs: Vec<LgCfg>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> Vec<Vec<f32>>{
-    for cfg in indices {
-        attrs = interp_by_lg(positions, cfg, attrs, &lg_attrs, lg_pos, start, end);
+pub fn interp_mult_by_lg(positions: &[f32], indices: &PolygonIndices, indices_slice: PolygonSlice, attrs:  &mut [&mut Vec<f32>], lg_attrs: Vec<LgCfg>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) {
+    let a: &[usize] = &indices.counts[indices_slice.range];
+    let mut index_start = indices_slice.start;
+    for i in a.iter() {
+        interp_by_lg(positions, &indices.indices[index_start..index_start + *i], attrs, &lg_attrs, lg_pos, start, end);
+        index_start += *i;
     }
-
-    attrs
 }
 
-pub fn to_triangle(indices: &[u16], mut out_indices: Vec<u16>) -> Vec<u16> {
-    out_indices.extend_from_slice(&to_triangle_0(indices));
-
-    out_indices
+pub fn to_triangle(indices: &[u16], out_indices: &mut Vec<u16>) {
+    to_triangle_0(indices, out_indices)
 }
 
-pub fn mult_to_triangle(indices: &Vec<Vec<u16>>, mut out_indices: Vec<u16>) -> Vec<u16>{
-    for cfg in indices {
-        out_indices = to_triangle(cfg, out_indices);
+pub fn mult_to_triangle(indices: &PolygonIndices, mut out_indices: &mut Vec<u16>){
+    let a: &[usize] = &indices.counts;
+    let mut index_start = 0;
+    for i in a.iter() {
+        to_triangle(&indices.indices[index_start..index_start + *i], out_indices);
+        index_start += *i;
     }
-
-    out_indices
 }
 
 /**
@@ -243,24 +251,26 @@ pub fn split_by_radius_border_with_level(x: f32, y: f32, w: f32, h: f32, radius:
     
     let mut temp_index: usize = 0;
     while temp_index < count - 1 {
-        let indices: Vec<u16> = to_triangle_0(&[
+        let mut indices = Vec::new();
+        to_triangle_0(&[
             (temp_index) as u16,
             (temp_index + 1) as u16,
             (count + temp_index + 1) as u16,
             (count + temp_index) as u16
-        ]);
+        ], &mut indices);
 
         result_indices.extend_from_slice(&indices);
 
         temp_index = temp_index + 1;
     }
     
-    let indices: Vec<u16> = to_triangle_0(&[
+    let mut indices = Vec::new();
+    to_triangle_0(&[
         (count - 1) as u16,
         (0) as u16,
         (count + 0) as u16,
         (count + count - 1) as u16
-    ]);
+    ], &mut indices);
     result_indices.extend_from_slice(&indices);
 
     result.extend_from_slice(&result2);
@@ -325,24 +335,26 @@ pub fn split_by_radius_border_0(x: f32, y: f32, w: f32, h: f32, radius: f32, bor
     
     let mut temp_index: usize = 0;
     while temp_index < count - 1 {
-        let indices: Vec<u16> = to_triangle_0(&[
+        let mut indices: Vec<u16> = Vec::new();
+        to_triangle_0(&[
             (temp_index) as u16,
             (temp_index + 1) as u16,
             (count + temp_index + 1) as u16,
             (count + temp_index) as u16
-        ]);
+        ], &mut indices);
 
         result_indices.extend_from_slice(&indices);
 
         temp_index = temp_index + 1;
     }
     
-    let indices: Vec<u16> = to_triangle_0(&[
+    let mut indices: Vec<u16> = Vec::new();
+    to_triangle_0(&[
         (count - 1) as u16,
         (0) as u16,
         (count + 0) as u16,
         (count + count - 1) as u16
-    ]);
+    ], &mut indices);
     result_indices.extend_from_slice(&indices);
 
     result.extend_from_slice(&result2);
@@ -368,10 +380,8 @@ pub fn split_by_radius_with_level(x: f32, y: f32, w: f32, h: f32, radius: f32, l
     // get_rounded_rect_with_level(x, y, w, h, radius, z, level)
     get_rounded_rect_with_level(x, y, w, h, radius, level)
 }
-/**
- * (点数据流, [多边形顶点...])
- */
-pub type PolygonCfg = (Vec<f32>, Vec<Vec<u16>>);
+
+// pub type PolygonCfg = (Vec<f32>, Vec<Vec<u16>>);
 /**
  * (x, y, z)
  */
@@ -381,20 +391,55 @@ pub type Point3D = (f32, f32, f32);
  */
 pub type Point2D = (f32, f32);
 
+#[derive(Debug, Default, Clone)]
+pub struct PolygonIndices {
+    pub indices: Vec<u16>,
+    pub counts: Vec<usize>, // indices中各多边形的顶点数量 如果 counts为vec![4, 5], 则indices长度为4 + 5 = 9， 依次为一个四边形， 一个五边形
+}
+
+impl PolygonIndices {
+    pub fn clear(&mut self) {
+        self.indices.clear();
+        self.counts.clear();
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct PolygonSlice {
+    pub start: usize,
+    pub range: Range<usize>,
+}
+
+
+pub struct PolygonCfg {
+    pub positions: Vec<f32>,
+    pub indices: PolygonIndices,
+}
+
+pub struct Attribute<'a> {
+    pub unit: usize,
+    pub value: &'a mut Vec<f32>,
+}
+
 /**
  * 将一个多边形按照指示方向的多个空间线切分， 返回新的多边形
  * input:
+ *      result: 新的多边形放入result中
  *      points: 初始点数据集 - 三维数据
  *      polygon_indices: 初始多边形点索引列表
  *      lg_pos: 分割百分比列表
  *      start： 分割方向的起点
  *      end： 分割方向的终点
- * output:
- *      (点数据流, [多边形顶点...])
- *      点数据流：在 points 后续添加点数据，
- *      [多边形顶点...]: 分割出来的多各多边形的索引列表， 索引列表为 points 中点索引
  */
-pub fn split_by_lg_0(mut points: Vec<f32>, polygon_indices: &Vec<u16>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> PolygonCfg {
+pub fn split_by_lg_0(
+    result: &mut PolygonIndices,
+    points: &mut Vec<f32>, 
+    attrs: &mut [Attribute],
+    polygon_indices: &[u16], 
+    lg_pos: &[f32], 
+    start: (f32, f32), 
+    end: (f32, f32)
+) {
     let _end    =  (end.0, -end.1);
     let _start  =  (start.0, -start.1);
     let dist_x  = _end.0 - _start.0;
@@ -440,11 +485,12 @@ pub fn split_by_lg_0(mut points: Vec<f32>, polygon_indices: &Vec<u16>, lg_pos: &
     let mut result_count: u16 = src_points_count as u16;
 
 
-    let mut index = 0;
-    while index < src_polygon_point_count {
+    let mut index0 = src_polygon_point_count - 1;
+    let mut index1 = 0; 
+    while index1 < src_polygon_point_count {
 
         // point1  = read_point_3d_f(&points, polygon_indices, index);
-        point1  = read_point_2d_f(&points, polygon_indices, index);
+        point1  = read_point_2d_f(&points, polygon_indices, index1);
 
         // println!("===========================边与界限求交点");
 
@@ -498,6 +544,7 @@ pub fn split_by_lg_0(mut points: Vec<f32>, polygon_indices: &Vec<u16>, lg_pos: &
 
                             new_indices_list.push((result_count - 1) as u16);
                             new_dot_list.push(lg_dot[l_index]);
+                            interp_attrs_by_line(attrs, index0, index1, (_x, -_y), point0, point1);
 
                             // println!("新增： x: {:?} ---- y: {:?}", _x, -_y);
                         }
@@ -550,6 +597,7 @@ pub fn split_by_lg_0(mut points: Vec<f32>, polygon_indices: &Vec<u16>, lg_pos: &
                             new_indices_list.push((result_count - 1) as u16);
                             new_dot_list.push(lg_dot[l_count - l_index - 1]);
 
+                            interp_attrs_by_line(attrs, index0, index1, (_x, -_y), point0, point1);
                             // println!("新增： x: {:?} ---- y: {:?}", _x, -_y);
                         }
                     }
@@ -560,80 +608,114 @@ pub fn split_by_lg_0(mut points: Vec<f32>, polygon_indices: &Vec<u16>, lg_pos: &
         }
 
 
-        if index < src_polygon_point_count - 1 {
+        if index1 < src_polygon_point_count - 1 {
             let temp_dot = get_dot(direct_vec2[0], direct_vec2[1], point1.0 - _start.0, point1.1 - _start.1);
-            new_indices_list.push(polygon_indices[index]);
+            new_indices_list.push(polygon_indices[index1]);
             new_dot_list.push(temp_dot);
         }
 
         point0 = point1;
 
-        index = index + 1;
+        index0 = index1;
+        index1 = index1 + 1;
     }
 
-    let mut new_polygon_indices_list: Vec<Vec<u16>> = Vec::new();
+    // let mut new_polygon_indices_list: Vec<Vec<u16>> = Vec::new();
     let mut min_dot: f32;
     let mut max_dot: f32;
 
     let new_point_count = new_indices_list.len();
     
-    index   = 0;
-    min_dot = lg_dot[index];
+    index1   = 0;
+    min_dot = lg_dot[index1];
 
     let mut i_index = 0;
-    let mut new_polygon: Vec<u16> = Vec::new();
+    let mut new_polygon_start = result.indices.len();
     while i_index < new_point_count {
         if new_dot_list[i_index] <= min_dot {
-            new_polygon.push(new_indices_list[i_index]);
+            result.indices.push(new_indices_list[i_index]);
         }
 
         i_index = i_index + 1;
     }
-    if new_polygon.len() > 2 {
-        new_polygon_indices_list.push(new_polygon);
+    let count = result.indices.len() - new_polygon_start;
+    if count > 2 {
+        result.counts.push(count);
+    } else {
+        unsafe { result.indices.set_len(new_polygon_start) } // 
     }
 
-    index = 0;
-    while index < src_lg_count - 1 {
-        min_dot = lg_dot[index];
-        max_dot = lg_dot[index + 1];
+    index1 = 0;
+    while index1 < src_lg_count - 1 {
+        min_dot = lg_dot[index1];
+        max_dot = lg_dot[index1 + 1];
 
         i_index = 0;
-        let mut new_polygon: Vec<u16> = Vec::new();
+        let mut new_polygon_start = result.indices.len();
         while i_index < new_point_count {
             if min_dot <= new_dot_list[i_index] && new_dot_list[i_index] <= max_dot {
-                new_polygon.push(new_indices_list[i_index]);
+                result.indices.push(new_indices_list[i_index]);
             }
 
             i_index = i_index + 1;
         }
-        if new_polygon.len() > 2 {
-            new_polygon_indices_list.push(new_polygon);
+        let count = result.indices.len() - new_polygon_start;
+        if count > 2 {
+            result.counts.push(count);
+        } else {
+            unsafe { result.indices.set_len(new_polygon_start) } // 
         }
 
-        index = index + 1;
+        index1 = index1 + 1;
     }
     
-    index   = src_lg_count - 1;
-    max_dot = lg_dot[index];
+    index1   = src_lg_count - 1;
+    max_dot = lg_dot[index1];
 
-    let mut new_polygon: Vec<u16> = Vec::new();
+    let new_polygon_start = result.indices.len();
     i_index = 0;
     while i_index < new_point_count {
         if max_dot <= new_dot_list[i_index] {
-            new_polygon.push(new_indices_list[i_index]);
+            result.indices.push(new_indices_list[i_index]);
         }
 
         i_index = i_index + 1;
     }
-    if new_polygon.len() > 2 {
-        new_polygon_indices_list.push(new_polygon);
+    let count = result.indices.len() - new_polygon_start;
+    if count > 2 {
+        result.counts.push(count);
+    } else {
+        unsafe { result.indices.set_len(new_polygon_start) } // 
     }
 
     // println!("split_by_lg_0: {:?}\n", points);
     // println!("split_by_lg_0: {:?}\n", new_polygon_indices_list);
+}
 
-    (points, new_polygon_indices_list)
+// point0 != point1;
+fn interp_attrs_by_line (
+    attrs: &mut [Attribute],
+    p0_index: usize,
+    p1_index: usize,
+    target: (f32, f32), 
+    point0: (f32, f32), 
+    point1: (f32, f32),
+) {
+    if attrs.len() == 0 {
+        return;
+    }
+
+    let p0_weight = (target.0 - point0.0) / (point1.0 - point0.0).min(0.001);
+    let p1_weight = 1.0 - p0_weight;
+
+    for attr in attrs.iter_mut() {
+        let index0 = p0_index * attr.unit;
+        let index1 = p1_index * attr.unit;
+        for i in 0..attr.unit {
+            let r = p0_weight * attr.value[index0 + i] + p1_weight * attr.value[index1 + i];
+            attr.value.push(r);
+        }
+    }
 }
 
 fn read_point_3d_f(points: &[f32], indices: &[u16], indices_index: usize) -> Point3D {
@@ -677,7 +759,7 @@ pub struct LgCfg{
  * out:
  *      points 中点的属性数据流
  */
-pub fn interp_by_lg_0(points: &[f32], polygon_indices: &[u16], mut attrs: Vec<Vec<f32>>, lg_attrs: &Vec<LgCfg>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) -> Vec<Vec<f32>> {
+pub fn interp_by_lg_0(points: &[f32], polygon_indices: &[u16], attrs: &mut [&mut Vec<f32>], lg_attrs: &Vec<LgCfg>, lg_pos: &[f32], start: (f32, f32), end: (f32, f32)) {
     let dist_x  = end.0 - start.0;
     let dist_y  = end.1 - start.1;
     let dist    = (dist_x.powi(2) + dist_y.powi(2)).sqrt();
@@ -688,13 +770,13 @@ pub fn interp_by_lg_0(points: &[f32], polygon_indices: &[u16], mut attrs: Vec<Ve
 
     let attr_count  = lg_attrs.len();
 
-    if attrs.len() == 0 {
-        let mut index = 0;
-        while index < attr_count {
-            attrs.push(Vec::new());
-            index = index + 1;
-        }
-    }
+    // if attrs.len() == 0 {
+    //     let mut index = 0;
+    //     while index < attr_count {
+    //         attrs.push(Vec::new());
+    //         index = index + 1;
+    //     }
+    // }
 
     // 有效属性，在插值方向上的起始
     let start_lg    = lg_pos[0];
@@ -769,8 +851,6 @@ pub fn interp_by_lg_0(points: &[f32], polygon_indices: &[u16], mut attrs: Vec<Ve
 
         index = index + 1;
     }
-
-    attrs
 }
 
 fn insert_vec(mut data_list: Vec<f32>, data: &[f32], size: u16, index: u16) -> Vec<f32> {
@@ -807,19 +887,16 @@ fn fill_vec(mut data_list: Vec<f32>, size: u16, value: f32) -> Vec<f32> {
 }
 
 //将多边形转换为三角形
-pub fn to_triangle_0(indices: &[u16]) -> Vec<u16> {
-    let mut res_indices: Vec<u16> = Vec::new();
+pub fn to_triangle_0(indices: &[u16], out_indices: &mut Vec<u16>) {
     let mut index: usize = 1;
     let count = indices.len();
     while index <= count - 2 {
-        res_indices.push(indices[0]);
-        res_indices.push(indices[index]);
-        res_indices.push(indices[index + 1]);
+        out_indices.push(indices[0]);
+        out_indices.push(indices[index]);
+        out_indices.push(indices[index + 1]);
 
         index = index + 1;
     }
-
-    res_indices
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
