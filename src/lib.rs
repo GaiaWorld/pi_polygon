@@ -137,7 +137,7 @@ pub fn to_triangle(indices: &[u16], out_indices: &mut Vec<u16>) {
     to_triangle_0(indices, out_indices)
 }
 
-pub fn mult_to_triangle(indices: &PolygonIndices, mut out_indices: &mut Vec<u16>){
+pub fn mult_to_triangle(indices: &PolygonIndices, out_indices: &mut Vec<u16>){
     let a: &[usize] = &indices.counts;
     let mut index_start = 0;
     for i in a.iter() {
@@ -366,7 +366,7 @@ pub fn split_by_radius_border_0(x: f32, y: f32, w: f32, h: f32, radius: f32, bor
  * 多边形方向：逆时针
  */
 // pub fn split_by_radius_0(x: f32, y: f32, w: f32, h: f32, radius: f32, z: f32) -> Vec<f32> {
-pub fn split_by_radius_0(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Point2D_Vec {
+pub fn split_by_radius_0(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Point2DVec {
     // get_rounded_rect(x, y, w, h, radius, z)
     get_rounded_rect(x, y, w, h, radius)
 }
@@ -376,7 +376,7 @@ pub fn split_by_radius_0(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Point2D
  * 多边形方向：逆时针
  */
 // pub fn split_by_radius_with_level(x: f32, y: f32, w: f32, h: f32, radius: f32, z: f32, level: u16) -> Vec<f32> {
-pub fn split_by_radius_with_level(x: f32, y: f32, w: f32, h: f32, radius: f32, level: u16) -> Point2D_Vec {
+pub fn split_by_radius_with_level(x: f32, y: f32, w: f32, h: f32, radius: f32, level: u16) -> Point2DVec {
     // get_rounded_rect_with_level(x, y, w, h, radius, z, level)
     get_rounded_rect_with_level(x, y, w, h, radius, level)
 }
@@ -517,20 +517,16 @@ pub fn split_by_lg_0(
                     
                     // println!("交点： x: {:?} --- y: {:?}", _x, _y);
                     if has_intersect {
-                        // println!("满足条件04");
-                        if !((point0.0 == _x && point0.1 == _y) || (point1.0 == _x && point1.1 == _y))  {
-                            
-                            // println!("满足条件05");
+                        // println!("满足条件05");
 
-                            result_count = result_count + 1;
-                            // points.extend_from_slice(&[_x, -_y, z]);
-                            points.extend_from_slice(&[_x, -_y]);
+                        result_count = result_count + 1;
+                        // points.extend_from_slice(&[_x, -_y, z]);
+                        points.extend_from_slice(&[_x, -_y]);
 
-                            new_indices_list.push((result_count - 1) as u16);
-                            new_dot_list.push(lg_dot[l_index]);
-                            // log::warn!("新增2： x: {:?} ---- y: {:?}, pos_index: {:?}", _x, _y, points.len());
-                            interp_attrs_by_line(attrs, polygon_indices, index0, index1, (_x, _y), point0, point1);
-                        }
+                        new_indices_list.push((result_count - 1) as u16);
+                        new_dot_list.push(lg_dot[l_index]);
+                        // log::warn!("新增2： x: {:?} ---- y: {:?}, pos_index: {:?}", _x, _y, points.len());
+                        interp_attrs_by_line(attrs, polygon_indices, index0, index1, (_x, _y), point0, point1);
                     }
                     
                     l_index = l_index + 1;
@@ -552,20 +548,15 @@ pub fn split_by_lg_0(
                     // println!("交点： x: {:?} --- y: {:?}", _x, _y);
 
                     if has_intersect {
-                        // println!("满足条件14");
-                        if !((point0.0 == _x && point0.1 == _y) || (point1.0 == _x && point1.1 == _y)) {
-                            // println!("满足条件15");
-                            result_count = result_count + 1;
-                            // points.extend_from_slice(&[_x, -_y, z]);
-                            points.extend_from_slice(&[_x, -_y]);
-                            
-                            new_indices_list.push((result_count - 1) as u16);
-                            new_dot_list.push(lg_dot[l_count - l_index - 1]);
+                        result_count = result_count + 1;
+                        // points.extend_from_slice(&[_x, -_y, z]);
+                        points.extend_from_slice(&[_x, -_y]);
+                        
+                        new_indices_list.push((result_count - 1) as u16);
+                        new_dot_list.push(lg_dot[l_count - l_index - 1]);
 
-                            // log::warn!("新增1： x: {:?} ---- y: {:?}, pos_index: {:?}", _x, _y, points.len() - 1);
-                            interp_attrs_by_line(attrs, polygon_indices, index0, index1, (_x, _y), point0, point1);
-                            
-                        }
+                        // log::warn!("新增1： x: {:?} ---- y: {:?}, pos_index: {:?}", _x, _y, points.len() - 1);
+                        interp_attrs_by_line(attrs, polygon_indices, index0, index1, (_x, _y), point0, point1);
                     }
 
                     l_index = l_index + 1;
@@ -596,7 +587,7 @@ pub fn split_by_lg_0(
     min_dot = lg_dot[index1];
 
     let mut i_index = 0;
-    let mut new_polygon_start = result.indices.len();
+    let new_polygon_start = result.indices.len();
     while i_index < new_point_count {
         if new_dot_list[i_index] <= min_dot {
             result.indices.push(new_indices_list[i_index]);
@@ -617,7 +608,7 @@ pub fn split_by_lg_0(
         max_dot = lg_dot[index1 + 1];
 
         i_index = 0;
-        let mut new_polygon_start = result.indices.len();
+        let new_polygon_start = result.indices.len();
         while i_index < new_point_count {
             if min_dot <= new_dot_list[i_index] && new_dot_list[i_index] <= max_dot {
                 result.indices.push(new_indices_list[i_index]);
@@ -695,20 +686,20 @@ const EPSILON: f32 = std::f32::EPSILON * 1024.0;
 #[inline]
 pub fn eq_f32(v1: f32, v2: f32) -> bool { v1 == v2 || ((v2 - v1).abs() <= EPSILON) }
 
-fn read_point_3d_f(points: &[f32], indices: &[u16], indices_index: usize) -> Point3D {
-    let ix = (indices[indices_index] * 3) as usize;
-    (points[ix + 0], -points[ix + 1], points[ix + 2])
-}
+// fn read_point_3d_f(points: &[f32], indices: &[u16], indices_index: usize) -> Point3D {
+//     let ix = (indices[indices_index] * 3) as usize;
+//     (points[ix + 0], -points[ix + 1], points[ix + 2])
+// }
 
 fn read_point_2d_f(points: &[f32], indices: &[u16], indices_index: usize) -> Point2D {
     let ix = (indices[indices_index] * 2) as usize;
     (points[ix + 0], -points[ix + 1])
 }
 
-fn read_point_3d(points: &[f32], indices: &[u16], indices_index: usize) -> Point3D {
-    let ix = (indices[indices_index] * 3) as usize;
-    (points[ix + 0], points[ix + 1], points[ix + 2])
-}
+// fn read_point_3d(points: &[f32], indices: &[u16], indices_index: usize) -> Point3D {
+//     let ix = (indices[indices_index] * 3) as usize;
+//     (points[ix + 0], points[ix + 1], points[ix + 2])
+// }
 
 fn read_point_2d(points: &[f32], indices: &[u16], indices_index: usize) -> Point2D {
     let ix = (indices[indices_index] * 2) as usize;
@@ -830,38 +821,38 @@ pub fn interp_by_lg_0(points: &[f32], polygon_indices: &[u16], attrs: &mut [&mut
     }
 }
 
-fn insert_vec(mut data_list: Vec<f32>, data: &[f32], size: u16, index: u16) -> Vec<f32> {
-    let trag_len = size * (index + 1);
-    let mut curr_len = data_list.len() as u16;
-    while curr_len < trag_len {
-        data_list.push(0.0);
+// fn insert_vec(mut data_list: Vec<f32>, data: &[f32], size: u16, index: u16) -> Vec<f32> {
+//     let trag_len = size * (index + 1);
+//     let mut curr_len = data_list.len() as u16;
+//     while curr_len < trag_len {
+//         data_list.push(0.0);
 
-        curr_len = curr_len + 1;
-    }
+//         curr_len = curr_len + 1;
+//     }
 
-    let i_index = size * (index as u16);
-    let mut i: u16 = 0;
-    while i < size {
-        data_list[(i_index + i) as usize] = data[i as usize];
+//     let i_index = size * (index as u16);
+//     let mut i: u16 = 0;
+//     while i < size {
+//         data_list[(i_index + i) as usize] = data[i as usize];
 
-        i = i + 1;
-    }
+//         i = i + 1;
+//     }
 
-    data_list
-}
+//     data_list
+// }
 
-fn fill_vec(mut data_list: Vec<f32>, size: u16, value: f32) -> Vec<f32> {
-    let trag_len = size;
-    let mut i_index = data_list.len() as u16;
+// fn fill_vec(mut data_list: Vec<f32>, size: u16, value: f32) -> Vec<f32> {
+//     let trag_len = size;
+//     let mut i_index = data_list.len() as u16;
 
-    while i_index < trag_len {
-        data_list.push(value);
+//     while i_index < trag_len {
+//         data_list.push(value);
         
-        i_index = i_index + 1;
-    }
+//         i_index = i_index + 1;
+//     }
 
-    data_list
-}
+//     data_list
+// }
 
 //将多边形转换为三角形
 pub fn to_triangle_0(indices: &[u16], out_indices: &mut Vec<u16>) {
@@ -936,8 +927,8 @@ fn scale_level(mut lv: u16) -> u16 {
  *          Vec<[f32;2]>
  */
 // pub fn get_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8, z: f32) -> Vec<f32> {
-pub fn get_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8) -> Point2D_Vec {
-    let mut segments: Vec<u16>;
+pub fn get_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8) -> Point2DVec {
+    let segments: Vec<u16>;
 
     if radius < RADIUS_4_8 {
         segments    = copy_level4();
@@ -952,8 +943,8 @@ pub fn get_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u
 }
 
 // pub fn get_one_quarter_arc_with_level(center_x: f32, center_y: f32, radius: f32, area_id: u8, z: f32, level: u16) -> Vec<f32> {
-pub fn get_one_quarter_arc_with_level(center_x: f32, center_y: f32, radius: f32, area_id: u8, level: u16) -> Point2D_Vec {
-    let mut segments: Vec<u16>;
+pub fn get_one_quarter_arc_with_level(center_x: f32, center_y: f32, radius: f32, area_id: u8, level: u16) -> Point2DVec {
+    let segments: Vec<u16>;
 
     if level == 4 {
         segments    = copy_level4();
@@ -970,7 +961,7 @@ pub fn get_one_quarter_arc_with_level(center_x: f32, center_y: f32, radius: f32,
  * @return Vec<f32> : [x0, y0, x1 ,y1 ... ]
  */
 // fn analy_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8, z: f32, segments: &Vec<u16>) -> Vec<f32> {
-fn analy_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8, segments: &Vec<u16>) -> Point2D_Vec {
+fn analy_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8, segments: &Vec<u16>) -> Point2DVec {
     
     let mut result_points: Vec<f32> = Vec::new();
 
@@ -1040,7 +1031,7 @@ fn analy_one_quarter_arc(center_x: f32, center_y: f32, radius: f32, area_id: u8,
  *          Vec<f32>
  */
 // pub fn get_rounded_rect(x: f32, y: f32, w: f32, h: f32, radius: f32, z: f32) -> Vec<f32> {
-pub fn get_rounded_rect(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Point2D_Vec {
+pub fn get_rounded_rect(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Point2DVec {
     let point_len: usize = 2;
     let mut result: Vec<f32> = Vec::new();
     let mut check_list: Vec<(f32,f32,u8)> = Vec::new();
@@ -1144,16 +1135,16 @@ fn get_line_with_direct(direct_vec2: [f32;2], x: f32, y: f32) -> (f32, f32, f32)
 }
 
 fn get_line_with_two_point(x0: f32, y0: f32, x1: f32, y1: f32) -> (f32, f32, f32) {
-    if x0 == x1 && y0 == y1 {
+    if eq_f32(x0, x1) && eq_f32(y0, y1) {
         (1.0, -1.0, 0.0)
     } else {
         (y0 - y1, x1 - x0, x0 * y1 - y0 * x1)
     }
 }
 
-fn get_line_with_slop(slop: f32, x: f32, y: f32) -> (f32, f32, f32) {
-    (slop, -1.0, y - slop * x)
-}
+// fn get_line_with_slop(slop: f32, x: f32, y: f32) -> (f32, f32, f32) {
+//     (slop, -1.0, y - slop * x)
+// }
 
 /**
  * 求两直线交点
@@ -1170,7 +1161,7 @@ fn get_two_lines_intersection(line1: LineCfg, line2: LineCfg) -> (bool, f32, f32
     let is_get;
 
     // 线平行
-    if d == 0.0 {
+    if eq_f32(d, 0.0) {
         if a0 * b1 == 0.0 && a0 != a1 && b0 != b1 {
             if a0 == 0.0 {
                 is_get = true;
@@ -1211,9 +1202,10 @@ fn get_dot(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
  * @param b 终点
  * @param v 目标
  */
-fn is_between(a: f32, b: f32, in_v: f32) -> bool {
-    // 目标点与端点差距 极小时，可能因为 目标点所在直线斜率 问题导致判断失误
-    let v = in_v;
+fn is_between(a: f32, b: f32, v: f32) -> bool {
+    if eq_f32(a, v) || eq_f32(b, v) {
+        return false;
+    }
 
     if b < a {
         return b < v && v <= (a + 0.0);
@@ -1281,7 +1273,7 @@ fn float_clip(v: f32) -> f32 {
     (v * 10000.0).round() / 10000.0
 }
 
-type Point2D_Vec = Vec<f32>;
+type Point2DVec = Vec<f32>;
 
 #[test]
 fn test() {
