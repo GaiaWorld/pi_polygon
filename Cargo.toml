@@ -1,9 +1,12 @@
 [package]
 name = "pi_polygon"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["baipeng <baipeng@yineng.com>"]
 edition = "2018"
 description = "polygon"
 repository = "https://github.com/GaiaWorld/pi_polygon.git"
 keywords = ["pi", "polygon"]
 license = "MIT OR Apache-2.0"
+
+[dependencies]
+log = "0.4"

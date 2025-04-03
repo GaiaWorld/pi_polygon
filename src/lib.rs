@@ -416,6 +416,7 @@ pub struct PolygonCfg {
     pub indices: PolygonIndices,
 }
 
+#[derive(Debug)]
 pub struct Attribute<'a> {
     pub unit: usize,
     pub value: &'a mut Vec<f32>,
@@ -494,12 +495,12 @@ pub fn split_by_lg_0(
 
         // println!("===========================边与界限求交点");
 
-        if !(point0.0 == point1.0 && point0.1 == point1.1) {
+        if !(eq_f32(point0.0, point1.0) && eq_f32(point0.1, point1.1)) {
             line0   = get_line_with_two_point(point0.0, point0.1, point1.0, point1.1);
 
             // println!("===========================获得边");
             // println!("{:?}", point1);
-
+            // log::warn!("get_dot p0: {:?} ---- p1: {:?}, dot: {:?}", point0, point1, get_dot(direct_vec2[0], direct_vec2[1], point1.0 - point0.0, point1.1 - point0.1));
             if get_dot(direct_vec2[0], direct_vec2[1], point1.0 - point0.0, point1.1 - point0.1) > 0.0 {
 
                 // println!("===========================获得边 - dot > 0.0");
@@ -512,26 +513,9 @@ pub fn split_by_lg_0(
                     // println!("===========================获得边 与 界限交点");
 
                     let (is_get, _x, _y) = get_two_lines_intersection(line0, lg_lines[l_index]);
-                    let mut has_intersect = false;
+                    let has_intersect = is_get && is_between_2d(&point0, &point1, &(_x, _y));
                     
                     // println!("交点： x: {:?} --- y: {:?}", _x, _y);
-                    if is_get {
-                        if point0.0 == point1.0 {
-                            // println!("满足条件01");
-                            if is_between(point0.1, point1.1, _y) == true {
-                                    has_intersect = true;
-                            }
-                        } else if point0.1 == point1.1 {
-                            // println!("满足条件02");
-                            if is_between(point0.0, point1.0, _x) == true {
-                                has_intersect = true;
-                            }
-                        }
-                        else if is_between(point0.0, point1.0, _x) == true {
-                            // println!("满足条件03");
-                            has_intersect = true;
-                        }
-                    }
                     if has_intersect {
                         // println!("满足条件04");
                         if !((point0.0 == _x && point0.1 == _y) || (point1.0 == _x && point1.1 == _y))  {
@@ -544,9 +528,8 @@ pub fn split_by_lg_0(
 
                             new_indices_list.push((result_count - 1) as u16);
                             new_dot_list.push(lg_dot[l_index]);
-                            interp_attrs_by_line(attrs, index0, index1, (_x, -_y), point0, point1);
-
-                            // println!("新增： x: {:?} ---- y: {:?}", _x, -_y);
+                            // log::warn!("新增2： x: {:?} ---- y: {:?}, pos_index: {:?}", _x, _y, points.len());
+                            interp_attrs_by_line(attrs, polygon_indices, index0, index1, (_x, _y), point0, point1);
                         }
                     }
                     
@@ -564,27 +547,9 @@ pub fn split_by_lg_0(
 
                     let (is_get, _x, _y) = get_two_lines_intersection(line0, lg_lines[l_count - l_index - 1]);
 
-                    let mut has_intersect = false;
+                    let has_intersect = is_get && is_between_2d(&point0, &point1, &(_x, _y));
                     
                     // println!("交点： x: {:?} --- y: {:?}", _x, _y);
-
-                    if is_get {
-                        if point0.0 == point1.0 {
-                            // println!("满足条件11");
-                            if is_between(point1.1, point0.1, _y) == true {
-                                    has_intersect = true;
-                            }
-                        } else if point0.1 == point1.1 {
-                            // println!("满足条件12");
-                            if is_between(point1.0, point0.0, _x) == true {
-                                has_intersect = true;
-                            }
-                        }
-                        else if is_between(point1.0, point0.0, _x) == true {
-                            // println!("满足条件13");
-                            has_intersect = true;
-                        }
-                    }
 
                     if has_intersect {
                         // println!("满足条件14");
@@ -597,8 +562,9 @@ pub fn split_by_lg_0(
                             new_indices_list.push((result_count - 1) as u16);
                             new_dot_list.push(lg_dot[l_count - l_index - 1]);
 
-                            interp_attrs_by_line(attrs, index0, index1, (_x, -_y), point0, point1);
-                            // println!("新增： x: {:?} ---- y: {:?}", _x, -_y);
+                            // log::warn!("新增1： x: {:?} ---- y: {:?}, pos_index: {:?}", _x, _y, points.len() - 1);
+                            interp_attrs_by_line(attrs, polygon_indices, index0, index1, (_x, _y), point0, point1);
+                            
                         }
                     }
 
@@ -695,6 +661,7 @@ pub fn split_by_lg_0(
 // point0 != point1;
 fn interp_attrs_by_line (
     attrs: &mut [Attribute],
+    indices: &[u16],
     p0_index: usize,
     p1_index: usize,
     target: (f32, f32), 
@@ -705,18 +672,28 @@ fn interp_attrs_by_line (
         return;
     }
 
-    let p0_weight = (target.0 - point0.0) / (point1.0 - point0.0).min(0.001);
+    let delta = point1.0 - point0.0;
+    let p0_weight = if delta.abs() < f32::EPSILON {
+        (target.1 - point0.1) / (point1.1 - point0.1)
+    } else {
+        (target.0 - point0.0) / (point1.0 - point0.0)
+    };
     let p1_weight = 1.0 - p0_weight;
 
     for attr in attrs.iter_mut() {
-        let index0 = p0_index * attr.unit;
-        let index1 = p1_index * attr.unit;
+        let index0 = indices[p0_index] as usize * attr.unit;
+        let index1 = indices[p1_index] as usize * attr.unit;
         for i in 0..attr.unit {
-            let r = p0_weight * attr.value[index0 + i] + p1_weight * attr.value[index1 + i];
+            let r = p1_weight * attr.value[index0 + i] + p0_weight * attr.value[index1 + i];
+            // log::warn!("interp_attrs_by_line======{:?}", (index0, index1, r, &target, &point0, &point1, p0_weight, attr.value[index0 + i], attr.value[index1 + i]));
             attr.value.push(r);
         }
     }
 }
+
+const EPSILON: f32 = std::f32::EPSILON * 1024.0;
+#[inline]
+pub fn eq_f32(v1: f32, v2: f32) -> bool { v1 == v2 || ((v2 - v1).abs() <= EPSILON) }
 
 fn read_point_3d_f(points: &[f32], indices: &[u16], indices_index: usize) -> Point3D {
     let ix = (indices[indices_index] * 3) as usize;
@@ -1245,6 +1222,21 @@ fn is_between(a: f32, b: f32, in_v: f32) -> bool {
     } else {
         return a == v;
     }
+}
+
+fn is_between_2d(point0: &(f32, f32), point1: &(f32, f32), target: &(f32, f32)) -> bool {
+    if eq_f32(point0.0, point1.0) {
+        // println!("满足条件01");
+        if is_between(point0.1, point1.1, target.1) == true {
+                return true;
+        }
+    } else {
+        // println!("满足条件02");
+        if is_between(point0.0, point1.0, target.0) == true {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn find_pre_next_grad_direct(data_list: &[f32], value: f32) -> (usize, usize) {
